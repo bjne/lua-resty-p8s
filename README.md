@@ -9,7 +9,7 @@ expose them on a separate web page to be pulled by
 copy the contents of the lib directory recursively to a path available in
 `lua_package_path`
 
-openresty users will find this library in [opm](https://opm.openresty.org/).
+openresty users will (not yet) find this library in [opm](https://opm.openresty.org/).
 
 ## Quick start guide
 
@@ -33,15 +33,12 @@ init_worker_by_lua_block {
 }
 
 log_by_lua_block {
-    con:reset():set(10, "foo")
     req(ngx.var.server_name, ngx.var.status)
     lat(tonumber(ngx.var.request_time), ngx.var.server_name)
 }
 ```
 
-This:
 * configures a shared dictionary with the default name `lua_resty_p8s`
-  with a 10MB limit;
 * registers a gauge called `con` with one label `state`
 * registers a counter called `req` with two labels: `host` and `status`
 * registers a histogram called `lat` with one label `host`
@@ -229,6 +226,13 @@ Resets a metric to zero for current worker by default
 
 * `worker` can be null for current worker, a id or `true` for all workers
 
+`reset` returns self, so it can be nested like
+
+Example:
+```
+    gauge:reset():set(10, "foo")
+```
+
 ### (gauge or counter or histogram):help(*help*)
 
 **syntax:** (gauge or counter or histogram):help(*help*)
@@ -236,3 +240,19 @@ Resets a metric to zero for current worker by default
 Sets a HELP text for current metric, if that is something you want to waste bytes on
 
 * `help` text, nil to clear current help
+
+## What is different compared to alternatives
+
+This module uses LuaJIT serialization instead of pure shm to synchronize
+metrics between workers. This means all counter updates are only done in
+the local lua VM, and cross worker updates are a single shm write/interval
+
+Rendering of prometheus output format is nworkers shm gets, and a local
+merge. This should perform well when using multiple counters
+
+Metrics are garbagecollected, so no need to delete them, just let the lua gc
+take care of it. Keep in mind tho, that you need to keep a reference.
+
+On reload (currenly) data is loaded from shm, but unless the same metric
+if created again, garbagecollection may currently remove the data before
+its recreated. Creating metrics in `init_worker` will mitigate this issue
