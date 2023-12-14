@@ -1,0 +1,12 @@
+todo: count number of keys/size of shm and clear subtables?
+      -> counters for nkeys added as metric[7] to all data
+todo: last updates counters everywhere
+      -> update counter added to metric[6]
+      -> does not work well with merging, max()?
+todo: add "allways label"
+      -> prom.counter("per_worker_foo", {foo="bar"}, "foo", "bar")
+      -> where should this be stored?
+todo: metric with labels print HELP and TYPE but no data when uninitialized
+todo: values are lost on reload after loading values from shm, due to weak
+      weak tables and lua gc beeing run before the metric is initialized.
+      If this proves to be a problem, create a different data gc than __mode=v
