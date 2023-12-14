@@ -37,7 +37,7 @@ local walk do
     end
 end
 
-local clear do
+local reset do
     local getname do
         local name_lookup = setmetatable({}, {__mode = "k"})
 
@@ -54,7 +54,7 @@ local clear do
         end
     end
 
-    clear = function(metric, wid)
+    reset = function(metric, wid)
         worker_id = worker_id or ngx.worker.id()
         wid = wid or worker_id
         local cnt = worker_cnt()
@@ -310,7 +310,7 @@ end
 
 for _,m in ipairs(mt) do
     m.__index.help = set_help
-    m.__index.clear = clear
+    m.__index.reset = reset
 end
 
 return _M

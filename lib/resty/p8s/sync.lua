@@ -144,7 +144,7 @@ return function(shdict, data, memo, ipc)
             end
 
             if data[name] then
-                data[name]:clear()
+                data[name]:reset()
             end
 
             nevent = nevent + 1

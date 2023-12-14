@@ -131,7 +131,7 @@ local merge do
     merge = function(a,b,mt)
         if not b then return end
         for name, b_data in pairs(b) do
-            b_data[8] = nil -- do not accept clear from other workers or...
+            b_data[8] = nil -- do not accept reset from other workers
             local typ, a_data = type(b_data), a[name]
             if not a_data then
                 a[name] = mt and setmetatable(b_data, mt[b_data[1]]) or b_data
@@ -151,7 +151,7 @@ local merge do
                 log_err("inconsistent label names: %s", name)
             elseif b_data[1] >= typ_histogram and diff(b_data[5],a_data[5]) then
                 log_err("inconsistent bucket values: %s", name)
-            elseif a_data[8] == 1 then -- local clear flag
+            elseif a_data[8] == 1 then -- local reset flag
                 a_data[8] = nil
             else
                 a_data[6] = max(a_data[6] or 0, b_data[6] or 0) -- last updated
