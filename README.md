@@ -1,4 +1,4 @@
-# Prometheus metric library for nginx/openresty
+# prometheus (p8s) metric library for nginx/openresty
 
 This is a Lua library that can be used with Nginx to keep track of metrics and
 expose them on a separate web page to be pulled by
@@ -33,6 +33,7 @@ init_worker_by_lua_block {
 }
 
 log_by_lua_block {
+    con:reset():set(10, "foo")
     req(ngx.var.server_name, ngx.var.status)
     lat(tonumber(ngx.var.request_time), ngx.var.server_name)
 }
@@ -58,9 +59,9 @@ server {
 
     location /metrics {
         content_by_lua_block {
-            con:set(ngx.var.connections_reading, "reading")
-            con:set(ngx.var.connections_waiting, "waiting")
-            con:set(ngx.var.connections_writing, "writing")
+            con(ngx.var.connections_reading, "reading")
+            con(ngx.var.connections_waiting, "waiting")
+            con(ngx.var.connections_writing, "writing")
             p8s()
         }
     }
