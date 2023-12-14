@@ -1,5 +1,4 @@
 local data = require "resty.p8s.data"
-local merge = require "resty.p8s.merge"
 local format = require "resty.p8s.format"
 
 local ngx = ngx
@@ -8,6 +7,7 @@ local shdict
 local default_dict = "lua_resty_p8s"
 local sync_interval, timer_started = 1
 
+local merge = data.merge
 
 local _M do
     local metrics = {

@@ -313,4 +313,8 @@ for _,m in ipairs(mt) do
     m.__index.reset = reset
 end
 
+_M.merge = function(shdict)
+    return merge(shdict, ngx.worker.id(), data)
+end
+
 return _M

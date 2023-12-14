@@ -5,6 +5,7 @@ local ngx = ngx
 local max = math.max
 local sub = string.sub
 local worker_count = ngx.worker.count
+local log_info = log.log_info
 local log_warn = log.log_warn
 local log_err = log.log_err
 
@@ -163,16 +164,21 @@ local merge do
 end
 
 return function(shdict, worker, data, mt)
-    data = data or {}
+    local merged, wd = mt and data or {} -- local merge if mt is specified
 
-    for wid=(worker or 0), (worker or (worker_count()-1)) do
-        local wd = worker_data(shdict, wid, worker and mt)
+    for wid=(mt and worker or 0), (mt and worker or (worker_count()-1)) do
+        if wid == worker and not mt then -- merge for output, use current data
+            wd = data
+        else
+            wd = worker_data(shdict, wid, worker and mt)
+        end
+
         if wd and wd ~= true then
-            merge(data, wd, mt)
+            merge(merged, wd, mt)
         elseif not wd then
             log_err("failed to decode data for worker: %d", wid)
         end
     end
 
-    return data
+    return merged
 end

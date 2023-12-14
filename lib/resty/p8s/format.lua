@@ -1,3 +1,5 @@
+local log_err = require "resty.p8s.log".log_err
+
 local concat = table.concat
 local insert = table.insert
 local format = string.format
@@ -25,7 +27,7 @@ local typ_counter, typ_gauge, typ_histogram = 1,2,3
 
 local output, format_typ = {}, setmetatable({}, {__index = function(_, k)
     return function()
-        ngx.log(ngx.ERR, "undefined formatter for type: ", k)
+        ngx_err("undefined formatter for type: %q", k)
     end
 end})
 
