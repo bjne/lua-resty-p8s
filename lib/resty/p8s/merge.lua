@@ -66,7 +66,7 @@ local worker_data do
 
                 data._c("decode failed")
             elseif err then
-                data._c(err)
+                data._c("buffer error: %q", err)
             else
                 data._c("failed to get dict")
             end

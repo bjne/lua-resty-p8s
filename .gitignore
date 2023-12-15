@@ -4,3 +4,5 @@ proxy_temp
 scgi_temp
 uwsgi_temp
 lua-resty-p8s-*
+test
+conf

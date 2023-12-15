@@ -333,7 +333,13 @@ do
     local fmt = string.format
 
     g = function(n, evt) _g(n, worker_id or ngx_worker_id(), evt) end
-    c = function(...) _c(1, worker_id or ngx_worker_id(), fmt(...)) end
+    c = function(n, ...)
+        if type(n) == "number" then
+            return _c(n, worker_id or ngx_worker_id(), fmt(...))
+        end
+
+        _c(1, worker_id or ngx_worker_id(), fmt(n,...))
+    end
     h = function(n, evt) _h(n, worker_id or ngx_worker_id(), evt) end
 end
 
