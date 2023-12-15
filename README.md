@@ -18,12 +18,12 @@ broken down by server name and status, add the following to the `http` section
 of `nginx.conf`:
 
 ```
-lua_shared_dict lua_resty_p8s 10M;
+lua_shared_dict resty_p8s 10M;
 
 lua_package_path "/path/to/lua-resty-p8s/lib/?.lua;;";
 
 init_by_lua_block {
-    _G.p8s = require "resty.p8s".init()
+    _G.p8s = require "resty.p8s"
 }
 
 init_worker_by_lua_block {
@@ -34,11 +34,11 @@ init_worker_by_lua_block {
 
 log_by_lua_block {
     req(ngx.var.server_name, ngx.var.status)
-    lat(tonumber(ngx.var.request_time), ngx.var.server_name)
+    lat(ngx.var.request_time, ngx.var.server_name)
 }
 ```
 
-* configures a shared dictionary with the default name `lua_resty_p8s`
+* configures a shared dictionary with the default name `resty_p8s`
 * registers a gauge called `con` with one label `state`
 * registers a counter called `req` with two labels: `host` and `status`
 * registers a histogram called `lat` with one label `host`
@@ -187,8 +187,8 @@ be provided for counters with no labels.
 Example:
 ```
 log_by_lua_block {
-    metric_bytes(tonumber(ngx.var.request_length))
-    metric_requests(1, ngx.var.server_name, ngx.var.status)
+    metric_bytes(ngx.var.request_length)
+    metric_requests(ngx.var.server_name, ngx.var.status)
 }
 ```
 
@@ -213,8 +213,8 @@ Records a value in a previously registered histogram.
 Example:
 ```
 log_by_lua_block {
-    metric_latency(tonumber(ngx.var.request_time), ngx.var.server_name)
-    metric_response_sizes(tonumber(ngx.var.bytes_sent))
+    metric_latency(ngx.var.request_time, ngx.var.server_name)
+    metric_response_sizes(ngx.var.bytes_sent)
 }
 ```
 
