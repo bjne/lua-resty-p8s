@@ -1,15 +1,19 @@
-local log_err = require "resty.p8s.log".log_err
-local sync = require "resty.p8s.sync"
-local merge = require "resty.p8s.merge"
-
 local strbuf = require "string.buffer"
 
+local sync = require "resty.p8s.sync"
+local merge = require "resty.p8s.merge"
+local format = require "resty.p8s.format"
+
 local ngx = ngx
+local ngx_say = ngx.say
 local match = string.match
 local ngx_time = ngx.time
-local worker_cnt = ngx.worker.count
+local get_phase = ngx.get_phase
+local ngx_worker_id = ngx.worker.id
+local worker_cnt = ngx.worker.count()
+local timer_running
 
-local data, memo, ipc = setmetatable({}, {__mode = "v"}), {}, {}
+local data, memo, ipc, g, c, h = {}, {}, {}
 local worker_id
 
 local _M, mt = {}, {}
@@ -37,62 +41,57 @@ local walk do
     end
 end
 
-local reset do
-    local getname do
-        local name_lookup = setmetatable({}, {__mode = "k"})
+local getname do
+    local name_lookup = setmetatable({}, {__mode = "k"})
 
-        getname = function(metric)
-            if name_lookup[metric] then
-                return name_lookup[metric]
-            end
+    getname = function(metric)
+        if name_lookup[metric] then
+            return name_lookup[metric]
+        end
 
-            for name, m in pairs(data) do
-                if m == metric then
-                    return name
-                end
+        for name, m in pairs(data) do
+            if m == metric then
+                return name
             end
         end
     end
+end
 
-    reset = function(metric, wid)
-        worker_id = worker_id or ngx.worker.id()
-        wid = wid or worker_id
-        local cnt = worker_cnt()
+local reset = function(metric, wid)
+    if not worker_id then worker_id = ngx_worker_id() end
+    wid = wid or worker_id
 
-        if wid ~= true then
-            if not tonumber(wid) or wid %1~=0 or wid <0 or wid>=cnt then
-                log_err("invalid worker id: %s", tostring(wid))
-
-                return metric, false
-            end
+    if wid ~= true then
+        if not tonumber(wid) or wid %1~=0 or wid <0 or wid>=worker_cnt then
+            return metric, false
         end
-
-        if wid == true or worker_id == wid then
-            metric[6] = ngx_time()
-            metric[7] = 0   -- nkeys
-
-            if metric[2] then
-                metric[3] = {}
-            elseif metric[1] == 3 then -- histogram
-                for b=1,#metric[5]+2 do
-                    metric[3][b] = 0
-                end
-            else
-                metric[3] = 0
-            end
-
-            metric[8] = 1  -- set flag to prevent merge from populating on start
-        end
-
-        for w=(wid==true and 0 or wid),(wid==true and cnt-1 or wid) do
-            if wid ~= worker_id then
-                ipc[w] = ipc[w] or strbuf.new()
-                ipc[w]:encode(getname(metric))
-            end
-        end
-
-        return metric
     end
+
+    if wid == true or worker_id == wid then
+        metric[6] = ngx_time()
+        metric[7] = 0   -- nkeys
+
+        if metric[2] then
+            metric[3] = {}
+        elseif metric[1] == 3 then -- histogram
+            for b=1,#metric[5]+2 do
+                metric[3][b] = 0
+            end
+        else
+            metric[3] = 0
+        end
+
+        metric[8] = 1  -- set flag to prevent merge from populating on start
+    end
+
+    for w=(wid==true and 0 or wid),(wid==true and worker_cnt-1 or wid) do
+        if wid ~= worker_id then
+            ipc[w] = ipc[w] or strbuf.new()
+            ipc[w]:encode(getname(metric))
+        end
+    end
+
+    return metric
 end
 
 local new_typ do
@@ -164,20 +163,18 @@ local new_typ do
 end
 
 do
-    local running
-
     local sync_timer = function(_, shdict)
         sync(shdict, data, memo, ipc)
     end
 
     _M.start_timer = function(shdict, interval)
-        if not running then
-            merge(shdict, ngx.worker.id(), data, mt)
+        if not timer_running and get_phase() ~= "init" then
+            merge(shdict, ngx_worker_id(), data, mt)
 
-            running = ngx.timer.every(interval, sync_timer, shdict)
+            timer_running = ngx.timer.every(interval, sync_timer, shdict)
         end
 
-        return running
+        return timer_tunning
     end
 end
 
@@ -311,10 +308,25 @@ end
 for _,m in ipairs(mt) do
     m.__index.help = set_help
     m.__index.reset = reset
+    m.__index.getname = getname
 end
 
-_M.merge = function(shdict)
-    return merge(shdict, ngx.worker.id(), data)
+_M.output = function(shdict)
+    ngx.header.content_type = "text/plain; version=0.0.4"
+
+    ngx_say(format(merge(shdict, worker_id or ngx_worker_id(), data)))
 end
+
+do
+    local _g = _M.gauge("resty_p8s_gauge", "worker", "event")
+    local _c = _M.counter("resty_p8s_counter", "worker", "event")
+    local _h = _M.histogram("resty_p8s_histogram", "worker", "event")
+
+    g = function(n, evt) _g(n, worker_id or ngx_worker_id(), evt) end
+    c = function(n, evt) _c(n, worker_id or ngx_worker_id(), evt) end
+    h = function(n, evt) _h(n, worker_id or ngx_worker_id(), evt) end
+end
+
+setmetatable(data, {__mode = "v", __index = {_g=g,_c=c,_h=h}})
 
 return _M

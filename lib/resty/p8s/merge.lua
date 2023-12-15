@@ -1,13 +1,11 @@
 local strbuf = require "string.buffer"
-local log = require "resty.p8s.log"
 
 local ngx = ngx
 local max = math.max
 local sub = string.sub
-local worker_count = ngx.worker.count
-local log_info = log.log_info
-local log_warn = log.log_warn
-local log_err = log.log_err
+local remove = table.remove
+
+local worker_cnt = ngx.worker.count()
 
 local typ_counter, typ_gauge, typ_histogram = 1,2,3
 
@@ -18,6 +16,7 @@ local typ_counter, typ_gauge, typ_histogram = 1,2,3
 -- 5 buckets
 -- 6 updated
 -- 7 keycount
+-- 8 reset signal
 
 local worker_data do
     local bufs = setmetatable({}, {__mode="v"})
@@ -29,9 +28,7 @@ local worker_data do
             if dict then
                 local ok, opts = pcall(strbuf.decode, dict)
                 if not ok then
-                    log_err("failed to decode dictionary")
-
-                    return
+                    return nil, "dict decode error"
                 end
                 buf = strbuf.new(opts)
                 bufs[dict_id] = buf
@@ -39,38 +36,41 @@ local worker_data do
             end
 
             if #lru > 10 then
-                table.remove(lru, 11)
-                log_warn("recycling buffers")
+                remove(lru, 11)
             end
 
             return buf
         end
     end
 
-    worker_data = function(shdict, worker)
-        local data = shdict:get(worker)
-        if not data then
-            return true
+    worker_data = function(shdict, worker, data)
+        local wd = shdict:get(worker)
+        if wd then
+            local dict_id = sub(wd, 1, 32)
+
+            local buf, err = bufs[dict_id]
+
+            if not buf then
+                buf, err = new_buf(shdict, worker, dict_id)
+            end
+
+            if buf then
+                buf:reset():put(wd):skip(32)
+
+                local ok
+                ok, wd = pcall(buf.decode, buf)
+
+                if ok then
+                    return wd
+                end
+
+                data._c("decode failed")
+            elseif err then
+                data._c(err)
+            else
+                data._c("failed to get dict")
+            end
         end
-
-        local dict_id = sub(data, 1, 32)
-        local buf = bufs[dict_id] or new_buf(shdict, worker, dict_id)
-
-        if not buf then
-            log_err("failed to get dictionary from worker: %d", worker)
-
-            return true
-        end
-
-        buf:reset():put(data):skip(32)
-
-        local ok, wd = pcall(buf.decode, buf)
-
-        if ok then
-            return wd
-        end
-
-        log_err("failed to decode: %q", wd)
     end
 end
 
@@ -129,29 +129,31 @@ local merge do
         }
     end
 
-    merge = function(a,b,mt)
+    merge = function(a,b,data,mt)
         if not b then return end
+        local typ, a_data
         for name, b_data in pairs(b) do
             b_data[8] = nil -- do not accept reset from other workers
-            local typ, a_data = type(b_data), a[name]
+            typ, a_data = type(b_data), a[name]
+
             if not a_data then
                 a[name] = mt and setmetatable(b_data, mt[b_data[1]]) or b_data
             elseif typ ~= type(a_data) then
-                log_err("multiple types for metric: %s", name)
+                data._c("multiple types for metric")
             elseif typ ~= "table" then
-                log_err("unsupported metric value: %s", typ)
+                data._c("unsupported metric value")
             elseif b_data[1] ~= a_data[1] then
-                log_err("multiple metric definitions: %s", name)
+                data._c("multiple metric definitions")
             elseif type(b_data[2]) ~= type(a_data[2]) then
-                log_err("labeled and unlabeled metric: %s", name)
+                data._c("labeled and unlabeled metric")
             elseif b_data[1] <= typ_gauge and b_data[2] == nil then
                 a_data[3] = (a_data[3] or 0) + (b_data[3] or 0)
             elseif b_data[2] and #b_data[2] ~= #a_data[2] then
-                log_err("inconsistent label numbers: %s", name)
+                data._c("inconsistent label numbers")
             elseif b_data[2] and diff(a_data[2], b_data[2]) then
-                log_err("inconsistent label names: %s", name)
+                data._c("inconsistent label names")
             elseif b_data[1] >= typ_histogram and diff(b_data[5],a_data[5]) then
-                log_err("inconsistent bucket values: %s", name)
+                data._c("inconsistent bucket values")
             elseif a_data[8] == 1 then -- local reset flag
                 a_data[8] = nil
             else
@@ -160,24 +162,17 @@ local merge do
             end
         end
     end
-
 end
 
 return function(shdict, worker, data, mt)
-    local merged, wd = mt and data or {} -- local merge if mt is specified
+    if mt then -- local startup merge from shm
+        return merge(data, worker_data(shdict, worker, data), data, mt)
+    end
 
-    for wid=(mt and worker or 0), (mt and worker or (worker_count()-1)) do
-        if wid == worker and not mt then -- merge for output, use current data
-            wd = data
-        else
-            wd = worker_data(shdict, wid, worker and mt)
-        end
+    local merged = {}
 
-        if wd and wd ~= true then
-            merge(merged, wd, mt)
-        elseif not wd then
-            log_err("failed to decode data for worker: %d", wid)
-        end
+    for wid=0, worker_cnt-1 do
+        merge(merged, worker_data(shdict, wid, data), data)
     end
 
     return merged

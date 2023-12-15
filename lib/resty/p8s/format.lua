@@ -1,9 +1,6 @@
-local log_err = require "resty.p8s.log".log_err
-
 local concat = table.concat
 local insert = table.insert
 local format = string.format
-local gsub = string.gsub
 
 local clear_tab do local ok
     ok, clear_tab = pcall(require, "table.clear")
@@ -25,19 +22,11 @@ end
 
 local typ_counter, typ_gauge, typ_histogram = 1,2,3
 
-local output, format_typ = {}, setmetatable({}, {__index = function(_, k)
-    return function()
-        ngx_err("undefined formatter for type: %q", k)
-    end
-end})
+local output, format_typ = {}, {}
 
 local add = function(...)
     insert(output, format(...))
 end
-
---[[
-    # HELP http_requests_total Total number of http api requests
---]]
 
 local help = function(name, metric)
     if metric[4] then
@@ -69,27 +58,6 @@ local format_counter = function(name, metric, value, ...)
     local labels = format_labels(metric, ...)
     add([[%s{%s} %s]], name, concat(labels, ','), value)
 end
-
---[[
-
-The histogram and summary types are difficult to represent in the text format.
-The following conventions apply:
-
-* The sample sum for a summary or histogram named x is given as a separate
-  sample named x_sum.
-* The sample count for a summary or histogram named x is given as a separate
-  sample named x_count.
-* Each quantile of a summary named x is given as a separate sample line with
-  the same name x and a label {quantile="y"}.
-* Each bucket count of a histogram named x is given as a separate sample line
-  with the name x_bucket and a label {le="y"} (y is the bucket upper bound).
-* A histogram must have a bucket with {le="+Inf"}. Its value must be identical
-  to the value of x_count.
-* The buckets of a histogram and the quantiles of a summary must appear in
-  increasing numerical order of their label values (for the le or the quantile
-  label, respectively).
-
---]]
 
 local format_histogram = function(name, metric, value, ...)
     local labels = metric[2] and format_labels(metric, ...) or {}

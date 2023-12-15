@@ -1,13 +1,13 @@
 local data = require "resty.p8s.data"
-local format = require "resty.p8s.format"
 
 local ngx = ngx
 local get_phase = ngx.get_phase
 local shdict
-local default_dict = "lua_resty_p8s"
-local sync_interval, timer_started = 1
+local default_dict = "resty_p8s"
+local sync_interval = 1
+local timer_started
 
-local merge = data.merge
+local output = data.output
 
 local _M do
     local metrics = {
@@ -18,16 +18,20 @@ local _M do
 
     _M = setmetatable({}, {
         __call = function()
-            ngx.header.content_type = "text/plain; version=0.0.4"
-            ngx.say(format(merge(shdict)))
+            return output(shdict)
         end,
         __index = function(t,k)
-            if shdict and not timer_started and get_phase() ~= "init" then
-                timer_started = data.start_timer(shdict, sync_interval)
-                if timer_started then
-                    for name,metric in pairs(metrics) do
-                        t[name] = metric
+            if get_phase() ~= "init" and not timer_started then
+                shdict = shdict or ngx.shared[default_dict]
+                if shdict then
+                    timer_started = data.start_timer(shdict, sync_interval)
+                    if timer_started then
+                        for name,metric in pairs(metrics) do
+                            t[name] = metric
+                        end
                     end
+                else
+                    ngx.log(ngx.CRIT, "lua_shared_dict resty_p8s not defined")
                 end
             end
 
