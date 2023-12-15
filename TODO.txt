@@ -11,3 +11,4 @@ todo: convert all inputs to numbers to give a more userfriendly api
 todo: values are lost on reload after loading values from shm, due to weak
       weak tables and lua gc beeing run before the metric is initialized.
       If this proves to be a problem, create a different data gc than __mode=v
+todo: ensure only string/number type is inserted in tree (walk)

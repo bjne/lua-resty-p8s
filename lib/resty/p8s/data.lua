@@ -20,7 +20,7 @@ local _M, mt = {}, {}
 
 local walk do
     local function walk_recurse(metric, t, depth, k, ...)
-        k = k or ''
+        k = k or 'null'
 
         if depth == 0 then
             return t, k
@@ -179,17 +179,23 @@ do
 end
 
 do
-    local incr = function(self, n, ...)
-        local isnum,t,k = type(n) == "number"
+    local incr = function(self, l, ...)
+        local n = l
 
-        if isnum then
-            t,k = walk(self, ...)
-        else
-            t,k = walk(self, n, ...)
+        if self[2] and select('#', ...) < #self[2] then
+            n = nil
         end
 
-        self[6] = ngx_time()
-        t[k] = (t[k] or 0) + (isnum and n or 1)
+        if n and type(n) ~= "number" then
+            n = tonumber(n)
+            if not n then
+                return data._c("invalid increment for %q", self:getname())
+            end
+        end
+
+        local t,k = walk(self, select(n and 2 or 1, l, ...))
+
+        t[k], self[6] = (t[k] or 0) + (n or 1), ngx_time()
     end
 
     mt[1] = { __index = {incr = incr }, __call = incr}
@@ -201,13 +207,13 @@ end
 
 do
     local set = function(self, n, ...)
-        local isnum,t,k = type(n) == "number"
+        n = tonumber(n)
 
-        if not isnum then
+        if not n then
             return nil, "must provide a number to gauge:set()"
         end
 
-        t,k = walk(self, ...)
+        local t,k = walk(self, ...)
 
         t[k], self[6] = n, ngx_time()
     end
@@ -221,11 +227,13 @@ end
 
 do
     local observe = function(self, n, ...)
-        local isnum,nbuckets,t,k,first_seen = type(n) == "number", #self[5]
+        n = tonumber(n)
 
-        if not isnum then
+        if not n then
             return nil, "must provide a number to histogram:observe"
         end
+
+        local nbuckets,t,k,first_seen = #self[5]
 
         t,k = walk(self, ...)
         if not t[k] then
@@ -322,8 +330,10 @@ do
     local _c = _M.counter("resty_p8s_counter", "worker", "event")
     local _h = _M.histogram("resty_p8s_histogram", "worker", "event")
 
+    local fmt = string.format
+
     g = function(n, evt) _g(n, worker_id or ngx_worker_id(), evt) end
-    c = function(n, evt) _c(n, worker_id or ngx_worker_id(), evt) end
+    c = function(...) _c(1, worker_id or ngx_worker_id(), fmt(...)) end
     h = function(n, evt) _h(n, worker_id or ngx_worker_id(), evt) end
 end
 
