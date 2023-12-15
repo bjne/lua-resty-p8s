@@ -9,7 +9,7 @@ expose them on a separate web page to be pulled by
 copy the contents of the lib directory recursively to a path available in
 `lua_package_path`
 
-openresty users will (not yet) find this library in [opm](https://opm.openresty.org/).
+openresty users will find this library in [opm](https://opm.openresty.org/).
 
 ## Quick start guide
 
