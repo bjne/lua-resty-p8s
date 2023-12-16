@@ -23,7 +23,7 @@ lua_shared_dict resty_p8s 10M;
 lua_package_path "/path/to/lua-resty-p8s/lib/?.lua;;";
 
 init_by_lua_block {
-    _G.p8s = require("resty.p8s").disable_internal_metrics()
+    _G.p8s = require "resty.p8s"
 }
 
 init_worker_by_lua_block {
@@ -43,6 +43,13 @@ server {
         -- enables internal metrics for a spesific worker (or true for all)
         content_by_lua_block {
             p8s.enable_internal_metrics(true)
+        }
+    }
+
+    location /disable_internal_metrics {
+        -- disables internal metrics for a spesific worker (or true for all)
+        content_by_lua_block {
+            p8s.disable_internal_metrics(true)
         }
     }
 

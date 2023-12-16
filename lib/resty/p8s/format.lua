@@ -12,9 +12,10 @@ local clear_tab do local ok
 end
 
 local recurse_action do
-    local order = {}
     function recurse_action(name, metric, t, f, ordered_output, depth, ...)
         depth = depth or #metric[2]
+        local order = ordered_output and {}
+
         if type(t) ~= "table" then
             ngx.log(ngx.ERR, "data problem, not a table: ", name)
 
@@ -42,8 +43,6 @@ local recurse_action do
                 recurse_action(name, metric, t[k], f, ordered_output, depth-1, k, ...)
             end
         end
-
-        clear_tab(order)
     end
 end
 
