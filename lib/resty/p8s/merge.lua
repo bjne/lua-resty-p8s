@@ -171,8 +171,16 @@ return function(shdict, worker, data, mt)
 
     local merged = {}
 
-    for wid=0, worker_cnt-1 do
-        merge(merged, wid==worker and data or worker_data(shdict, wid, data), data)
+    --[[
+        iterate one extra time, and merge (current) local data last to prevent
+        the internal data structure from beeing mangled by a merge
+    --]]
+    for wid=0, worker_cnt do
+        if wid~=worker then
+            merge(merged, worker_data(shdict, wid, data), data)
+        elseif wid==worker_cnt then
+            merge(merged, data, data) -- final merge, no risk of data corruption
+        end
     end
 
     return merged
