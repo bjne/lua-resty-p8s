@@ -65,11 +65,17 @@ local worker_data do
                     return wd
                 end
 
-                data._c("decode failed")
+                if data._internal_metrics then
+                    data._c("decode failed")
+                end
             elseif err then
-                data._c("buffer error: %q", err)
+                if data._internal_metrics then
+                    data._c("buffer error: %q", err)
+                end
             else
-                data._c("failed to get dict")
+                if data._internal_metrics then
+                    data._c("failed to get dict")
+                end
             end
         end
     end
@@ -130,14 +136,18 @@ local merge do
         }
     end
 
+    local byte = string.byte
+
     merge = function(a,b,data,mt)
         if not b then return end
         local typ, a_data
         for name, b_data in pairs(b) do
-            b_data[8] = nil -- do not accept reset from other workers
             typ, a_data = type(b_data), a[name]
 
-            if not a_data then
+            if byte(name, 1) == 95 then
+                -- skip internal fields like _internal_metrics
+            elseif not a_data then
+                b_data[8] = nil -- do not accept reset from other workers
                 if data[name] and data[name][9] then -- nomerge
                     if b == data then
                         a[name] = b_data -- merge from self
@@ -146,21 +156,35 @@ local merge do
                     a[name] = mt and setmetatable(b_data, mt[b_data[1]]) or b_data
                 end
             elseif typ ~= type(a_data) then
-                data._c("multiple types for metric")
+                if data._internal_metrics then
+                    data._c("multiple types for metric")
+                end
             elseif typ ~= "table" then
-                data._c("unsupported metric value")
+                if data._internal_metrics then
+                    data._c("unsupported metric value")
+                end
             elseif b_data[1] ~= a_data[1] then
-                data._c("multiple metric definitions")
+                if data._internal_metrics then
+                    data._c("multiple metric definitions")
+                end
             elseif type(b_data[2]) ~= type(a_data[2]) then
-                data._c("labeled and unlabeled metric")
+                if data._internal_metrics then
+                    data._c("labeled and unlabeled metric")
+                end
             elseif b_data[1] <= typ_gauge and b_data[2] == nil then
                 a_data[3] = (a_data[3] or 0) + (b_data[3] or 0)
             elseif b_data[2] and #b_data[2] ~= #a_data[2] then
-                data._c("inconsistent label numbers")
+                if data._internal_metrics then
+                    data._c("inconsistent label numbers")
+                end
             elseif b_data[2] and diff(a_data[2], b_data[2]) then
-                data._c("inconsistent label names")
+                if data._internal_metrics then
+                    data._c("inconsistent label names")
+                end
             elseif b_data[1] >= typ_histogram and diff(b_data[5],a_data[5]) then
-                data._c("inconsistent bucket values")
+                if data._internal_metrics then
+                    data._c("inconsistent bucket values")
+                end
             elseif a_data[8] == 1 then -- local reset flag
                 a_data[8] = nil
             else
@@ -184,7 +208,6 @@ return function(shdict, worker, data, mt)
     --]]
     for wid=0, worker_cnt do
         if wid==worker_cnt then
-            ngx.log(ngx.ERR, "FINAL MERGE")
             merge(merged, data, data) -- final merge, no risk of data corruption
         elseif wid~=worker then
             merge(merged, worker_data(shdict, wid, data), data)

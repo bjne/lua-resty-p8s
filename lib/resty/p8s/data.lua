@@ -28,6 +28,11 @@ local walk do
         end
 
         if not t[k] then
+            local ktyp = type(k)
+            if ktyp ~= "string" or ktyp ~= "number" then
+                return nil, "invalid label"
+            end
+
             metric[7] = (metric[7] or 0) + 1 -- key count
             t[k], memo.buf = {}, nil
         end
@@ -184,7 +189,7 @@ do
             timer_running = ngx.timer.every(interval, sync_timer, shdict)
         end
 
-        return timer_tunning
+        return timer_running
     end
 end
 
@@ -199,11 +204,19 @@ do
         if n and type(n) ~= "number" then
             n = tonumber(n)
             if not n then
-                return data._c("invalid increment for %q", self:getname())
+                if data._internal_metrics then
+                    data._c("invalid increment for %q", self:getname())
+                end
+
+                return
             end
         end
 
         local t,k = walk(self, select(n and 2 or 1, l, ...))
+
+        if not t then
+            return nil, k
+        end
 
         t[k], self[6] = (t[k] or 0) + (n or 1), ngx_time()
     end
@@ -224,6 +237,10 @@ do
         end
 
         local t,k = walk(self, ...)
+
+        if not t then
+            return nil, k
+        end
 
         t[k], self[6] = n, ngx_time()
     end
@@ -246,6 +263,10 @@ do
         local nbuckets,t,k,first_seen = #self[5]
 
         t,k = walk(self, ...)
+        if not t then
+            return nil, k
+        end
+
         if not t[k] then
             t[k], first_seen = {}, true
         end
@@ -346,35 +367,31 @@ end
 do
     local _g, _c
     local fmt = string.format
-    local internal_metrics = true
+    data._internal_metrics = true
 
     g = function(n, evt)
-        if internal_metrics then
-            if not _g then
-                _g = _M.gauge("resty_p8s_gauge", "worker", "event")
-            end
-
-            _g(n, worker_id or ngx_worker_id(), evt)
+        if not _g then
+            _g = _M.gauge("resty_p8s_gauge", "worker", "event")
         end
+
+        _g(n, worker_id or ngx_worker_id(), evt)
     end
 
     c = function(n, ...)
-        if internal_metrics then
-            if not _c then
-                _c = _M.counter("resty_p8s_counter", "worker", "event")
-            end
-
-            if type(n) == "number" then
-                return _c(n, worker_id or ngx_worker_id(), fmt(...))
-            end
-
-            _c(1, worker_id or ngx_worker_id(), fmt(n,...))
+        if not _c then
+            _c = _M.counter("resty_p8s_counter", "worker", "event")
         end
+
+        if type(n) == "number" then
+            return _c(n, worker_id or ngx_worker_id(), fmt(...))
+        end
+
+        _c(1, worker_id or ngx_worker_id(), fmt(n,...))
     end
 
     _M.internal_metrics = function(enable, wid)
-        internal_metrics = enable == true
-        if not internal_metrics then
+        data._internal_metrics = enable == true
+        if not data._internal_metrics then
             _g = _g and _g:delete()
             _c = _c and _c:delete()
         end
@@ -391,7 +408,7 @@ do
     end
 end
 
-setmetatable(data, {__mode = "v", __index = {_g=g,_c=c,_h=h,_msg=msg}})
+setmetatable(data, {__mode = "v", __index = {_g=g,_c=c,_msg=msg}})
 
 
 return _M

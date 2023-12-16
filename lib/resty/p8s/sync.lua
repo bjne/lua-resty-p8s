@@ -10,12 +10,6 @@ local keep_keys = 2
 local worker_id
 local worker_cnt = ngx.worker.count() -- available in init_by_lua
 
-local function gauge(...)
-    gauge = require("resty.p8s").gauge("p8s_sync_stats", "worker", "event")
-
-    return gauge(...)
-end
-
 local sha256_t do
     local sha256 = require "resty.sha256".new()
 
@@ -68,15 +62,22 @@ local build_options_dict = function(shdict, data)
     local opts = {dict=keys}
     local hash_key, list_key = worker_id .. hash, worker_id .. '_p8s_hash'
 
-    data._g(#keys, "dict keys")
+    if data._internal_metrics then
+        data._g(#keys, "dict keys")
+    end
 
     shdict:set(hash_key, strbuf.encode(opts))
 
-    data._c("build dict")
+    if data._internal_metrics then
+        data._c("build dict")
+    end
 
     for _=((shdict:lpush(list_key, hash_key)) or 0),keep_keys+1,-1 do
         local hk = (shdict:rpop(list_key))
-        data._c("remove dict")
+        if data._internal_metrics then
+            data._c("remove dict")
+        end
+
         if hk and hk ~= hash_key then
             shdict:delete(hk)
         end
@@ -112,7 +113,9 @@ return function(shdict, data, memo, ipc)
 
     local serialized = buf:reset():put(hash):encode(data):get()
 
-    data._g(#serialized, "serialized size")
+    if data._internal_metrics then
+        data._g(#serialized, "serialized size")
+    end
 
     shdict:set(worker_id, serialized)
 
@@ -134,7 +137,9 @@ return function(shdict, data, memo, ipc)
         while #ipcbuf > 0 do
             local ok, msg = pcall(ipcbuf.decode, ipcbuf)
             if not ok then
-                data._c("failed to decode event")
+                if data._internal_metrics then
+                    data._c("failed to decode event")
+                end
                 break
             end
 
@@ -149,6 +154,8 @@ return function(shdict, data, memo, ipc)
             nevent = nevent + 1
         end
 
-        data._c(nevent, "ipc reset")
+        if data._internal_metrics then
+            data._c(nevent, "ipc reset")
+        end
     end
 end

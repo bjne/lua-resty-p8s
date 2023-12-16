@@ -16,7 +16,7 @@ local _M do
         histogram = data.histogram
     }
 
-    _M = setmetatable({_VERSION = "0.1.5" }, {
+    _M = setmetatable({_VERSION = "0.1.6" }, {
         __call = function()
             return output(shdict)
         end,
