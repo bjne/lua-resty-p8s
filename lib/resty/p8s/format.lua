@@ -36,7 +36,7 @@ local recurse_action do
             return
         end
 
-        for _,k in ipairs(order) do
+        for _,k in ipairs(sort(order) or order) do
             if depth == 1 then
                 f(name, metric, t[k], k, ...)
             else
