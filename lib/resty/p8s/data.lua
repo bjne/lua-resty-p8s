@@ -391,19 +391,26 @@ do
 
     _M.internal_metrics = function(enable, wid)
         data._internal_metrics = enable == true
-        if not data._internal_metrics then
-            _g = _g and _g:delete()
-            _c = _c and _c:delete()
-        end
 
         if wid then -- true for all workers
             ipc_send({cmd="internal_metrics", arg={enable}}, wid)
         end
     end
 
+    _M.reset_internal_metrics = function(wid)
+        _g = _g and _g:reset()
+        _c = _c and _c:reset()
+
+        if wid then
+            ipc_send({cmd="reset_internal_metrics"})
+        end
+    end
+
+    local empty_table = {}
+
     msg = function(m)
         if m.cmd and _M[m.cmd] then
-            _M[m.cmd](unpack(m.arg))
+            _M[m.cmd](unpack(m.arg or empty_table))
         end
     end
 end

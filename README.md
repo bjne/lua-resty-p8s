@@ -45,6 +45,20 @@ server {
             p8s.enable_internal_metrics(true)
         }
     }
+
+    location /no_internal_metrics {
+        content_by_lua_block {
+            p8s.disable_internal_metrics()
+            p8s()
+            p8s.enable_internal_metrics()
+        }
+    }
+
+    location /reset_internal_metrics_for_all_workers {
+        content_by_lua_block {
+            p8s.reset_internal_metrics(true)
+        }
+    }
 }
 ```
 

@@ -137,6 +137,7 @@ local merge do
     end
 
     local byte = string.byte
+    local find = string.find
 
     merge = function(a,b,data,mt)
         if not b then return end
@@ -145,10 +146,12 @@ local merge do
             typ, a_data = type(b_data), a[name]
 
             if byte(name, 1) == 95 then
-                -- skip internal fields like _internal_metrics
+                -- intentionally empty; skip internal fields like _internal_metrics
             elseif not a_data then
                 b_data[8] = nil -- do not accept reset from other workers
-                if data[name] and data[name][9] then -- nomerge
+                if not data._internal_metrics and find(name, '^resty_p8s_') then
+                    -- intentionally empty; skip merging internal metrics
+                elseif data[name] and data[name][9] then -- nomerge
                     if b == data then
                         a[name] = b_data -- merge from self
                     end

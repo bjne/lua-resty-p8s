@@ -154,8 +154,8 @@ return function(shdict, data, memo, ipc)
             nevent = nevent + 1
         end
 
-        if data._internal_metrics then
-            data._c(nevent, "ipc reset")
+        if nevent > 0 and data._internal_metrics then
+            data._c(nevent, "ipc")
         end
     end
 end
