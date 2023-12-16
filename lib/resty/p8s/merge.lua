@@ -139,7 +139,7 @@ local merge do
     local byte = string.byte
     local find = string.find
 
-    merge = function(a,b,data,mt)
+    merge = function(a,b,data,internal_metrics,mt)
         if not b then return end
         local typ, a_data
         for name, b_data in pairs(b) do
@@ -149,7 +149,7 @@ local merge do
                 -- intentionally empty; skip internal fields like _internal_metrics
             elseif not a_data then
                 b_data[8] = nil -- do not accept reset from other workers
-                if not data._internal_metrics and find(name, '^resty_p8s_') then
+                if not internal_metrics and find(name, '^resty_p8s_') then
                     -- intentionally empty; skip merging internal metrics
                 elseif data[name] and data[name][9] then -- nomerge
                     if b == data then
@@ -198,9 +198,9 @@ local merge do
     end
 end
 
-return function(shdict, worker, data, mt)
+return function(shdict, worker, data, internal_metrics, mt)
     if mt then -- local startup merge from shm
-        return merge(data, worker_data(shdict, worker, data), data, mt)
+        return merge(data, worker_data(shdict, worker, data), data, true, mt)
     end
 
     local merged = {}
@@ -211,9 +211,9 @@ return function(shdict, worker, data, mt)
     --]]
     for wid=0, worker_cnt do
         if wid==worker_cnt then
-            merge(merged, data, data) -- final merge, no risk of data corruption
+            merge(merged, data, data, internal_metrics) -- final merge
         elseif wid~=worker then
-            merge(merged, worker_data(shdict, wid, data), data)
+            merge(merged, worker_data(shdict, wid, data), data, internal_metrics)
         end
     end
 

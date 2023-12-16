@@ -184,7 +184,7 @@ do
 
     _M.start_timer = function(shdict, interval)
         if not timer_running and get_phase() ~= "init" then
-            merge(shdict, ngx_worker_id(), data, mt)
+            merge(shdict, ngx_worker_id(), data, true, mt)
 
             timer_running = ngx.timer.every(interval, sync_timer, shdict)
         end
@@ -358,10 +358,17 @@ for _,m in ipairs(mt) do
     m.__index.merge = set_merge
 end
 
-_M.output = function(shdict, ...)
-    ngx.header.content_type = "text/plain; version=0.0.4"
+_M.output = function(shdict, internal_metrics, ...)
+    if not worker_id then
+        worker_id = ngx_worker_id()
+    end
 
-    ngx_say(format(merge(shdict, worker_id or ngx_worker_id(), data), ...))
+    if internal_metrics ~= false then
+        internal_metrics = true
+    end
+
+    ngx.header.content_type = "text/plain; version=0.0.4"
+    ngx_say(format(merge(shdict, worker_id, data, internal_metrics), ...))
 end
 
 do
