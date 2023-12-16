@@ -29,8 +29,8 @@ local walk do
 
         if not t[k] then
             local ktyp = type(k)
-            if ktyp ~= "string" or ktyp ~= "number" then
-                return nil, "invalid label"
+            if ktyp ~= "string" and ktyp ~= "number" then
+                return nil, "invalid label type: " .. ktyp
             end
 
             metric[7] = (metric[7] or 0) + 1 -- key count
