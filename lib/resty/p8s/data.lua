@@ -402,7 +402,7 @@ do
         _c = _c and _c:reset()
 
         if wid then
-            ipc_send({cmd="reset_internal_metrics"})
+            ipc_send({cmd="reset_internal_metrics"}, wid)
         end
     end
 
