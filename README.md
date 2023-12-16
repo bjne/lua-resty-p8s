@@ -23,7 +23,7 @@ lua_shared_dict resty_p8s 10M;
 lua_package_path "/path/to/lua-resty-p8s/lib/?.lua;;";
 
 init_by_lua_block {
-    _G.p8s = require "resty.p8s"
+    _G.p8s = require("resty.p8s").disable_internal_metrics()
 }
 
 init_worker_by_lua_block {

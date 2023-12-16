@@ -40,6 +40,14 @@ local _M do
     })
 end
 
+_M.enable_internal_metrics = function()
+    data.internal_metrics(true)
+end
+
+_M.disable_internal_metrics = function()
+    data.internal_metrics(false)
+end
+
 _M.init = function(interval, dict)
     sync_interval = tonumber(interval) or sync_interval
     if shdict then

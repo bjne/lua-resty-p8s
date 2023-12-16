@@ -57,6 +57,10 @@ local getname do
     end
 end
 
+local delete = function(self)
+    data[self:getname()] = nil
+end
+
 local reset = function(metric, wid)
     if not worker_id then worker_id = ngx_worker_id() end
     wid = wid or worker_id
@@ -317,6 +321,7 @@ for _,m in ipairs(mt) do
     m.__index.help = set_help
     m.__index.reset = reset
     m.__index.getname = getname
+    m.__index.delete = delete
 end
 
 _M.output = function(shdict)
@@ -326,23 +331,44 @@ _M.output = function(shdict)
 end
 
 do
-    local _g = _M.gauge("resty_p8s_gauge", "worker", "event")
-    local _c = _M.counter("resty_p8s_counter", "worker", "event")
-    local _h = _M.histogram("resty_p8s_histogram", "worker", "event")
-
+    local _g, _c
     local fmt = string.format
+    local internal_metrics = true
 
-    g = function(n, evt) _g(n, worker_id or ngx_worker_id(), evt) end
-    c = function(n, ...)
-        if type(n) == "number" then
-            return _c(n, worker_id or ngx_worker_id(), fmt(...))
+    g = function(n, evt)
+        if internal_metrics then
+            if not _g then
+                _g = _M.gauge("resty_p8s_gauge", "worker", "event")
+            end
+
+            _g(n, worker_id or ngx_worker_id(), evt)
         end
-
-        _c(1, worker_id or ngx_worker_id(), fmt(n,...))
     end
-    h = function(n, evt) _h(n, worker_id or ngx_worker_id(), evt) end
+
+    c = function(n, ...)
+        if internal_metrics then
+            if not _c then
+                _c = _M.counter("resty_p8s_counter", "worker", "event")
+            end
+
+            if type(n) == "number" then
+                return _c(n, worker_id or ngx_worker_id(), fmt(...))
+            end
+
+            _c(1, worker_id or ngx_worker_id(), fmt(n,...))
+        end
+    end
+
+    _M.internal_metrics = function(enable)
+        internal_metrics = enable == true
+        if not internal_metrics then
+            _g = _g and _g:delete()
+            _c = _c and _c:delete()
+        end
+    end
 end
 
 setmetatable(data, {__mode = "v", __index = {_g=g,_c=c,_h=h}})
+
 
 return _M

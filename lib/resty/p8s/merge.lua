@@ -172,7 +172,7 @@ return function(shdict, worker, data, mt)
     local merged = {}
 
     for wid=0, worker_cnt-1 do
-        merge(merged, worker_data(shdict, wid, data), data)
+        merge(merged, wid==worker and data or worker_data(shdict, wid, data), data)
     end
 
     return merged
