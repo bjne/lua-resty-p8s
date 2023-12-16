@@ -59,6 +59,10 @@ server {
             p8s.reset_internal_metrics(true)
         }
     }
+
+    location /ordered_output {
+        content_by_lua_block { p8s(true) }
+    }
 }
 ```
 

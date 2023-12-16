@@ -16,9 +16,9 @@ local _M do
         histogram = data.histogram
     }
 
-    _M = setmetatable({_VERSION = "0.1.10" }, {
-        __call = function()
-            return output(shdict)
+    _M = setmetatable({_VERSION = "0.1.11" }, {
+        __call = function(...)
+            return output(shdict, ...)
         end,
         __index = function(t,k)
             if get_phase() ~= "init" and not timer_started then

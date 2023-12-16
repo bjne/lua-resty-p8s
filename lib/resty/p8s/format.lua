@@ -1,22 +1,49 @@
 local concat = table.concat
 local insert = table.insert
 local format = string.format
+local sort = table.sort
 
 local clear_tab do local ok
     ok, clear_tab = pcall(require, "table.clear")
     if not ok then
+        ngx.log(ngx.ERR, "performance degradation: table.clear unavailable")
         clear_tab=function(t) for k in pairs(t) do t[k]=nil end end
     end
 end
 
-local function recurse_action(name, metric, t, f, depth, ...)
-    depth = depth or #metric[2]
-    for k,v in pairs(t) do
-        if depth==1 then
-            f(name, metric, v, k, ...)
-        else
-            recurse_action(name, metric, v, f, depth-1, k, ...)
+local recurse_action do
+    local order = {}
+    function recurse_action(name, metric, t, f, ordered_output, depth, ...)
+        depth = depth or #metric[2]
+        if type(t) ~= "table" then
+            ngx.log(ngx.ERR, "data problem, not a table: ", name)
+
+            return
         end
+
+        for k,v in pairs(t) do
+            if ordered_output then
+                insert(order, k)
+            elseif depth==1 then
+                f(name, metric, v, k, ...)
+            else
+                recurse_action(name, metric, v, f, ordered_output, depth-1, k, ...)
+            end
+        end
+
+        if not ordered_output then
+            return
+        end
+
+        for _,k in ipairs(order) do
+            if depth == 1 then
+                f(name, metric, t[k], k, ...)
+            else
+                recurse_action(name, metric, t[k], f, ordered_output, depth-1, k, ...)
+            end
+        end
+
+        clear_tab(order)
     end
 end
 
@@ -78,34 +105,52 @@ local format_histogram = function(name, metric, value, ...)
     end
 end
 
-format_typ[typ_counter] = function(name, metric, typ)
+format_typ[typ_counter] = function(name, metric, ordered_output, typ)
     add([[# TYPE %s %s]], name, typ or "counter")
     if type(metric[3]) == "table" then
-        recurse_action(name, metric, metric[3], format_counter)
+        recurse_action(name, metric, metric[3], format_counter, ordered_output)
     else
         format_counter(name, metric, metric[3])
     end
 end
 
-format_typ[typ_gauge] = function(name, metric)
-    format_typ[typ_counter](name, metric, "gauge")
+format_typ[typ_gauge] = function(name, metric, ordered_output)
+    format_typ[typ_counter](name, metric, ordered_output, "gauge")
 end
 
-format_typ[typ_histogram] = function(name, metric)
+format_typ[typ_histogram] = function(name, metric, ordered_output)
     add([[# TYPE %s histogram]], name)
     if metric[2] then
-        recurse_action(name, metric, metric[3], format_histogram)
+        recurse_action(name, metric, metric[3], format_histogram, ordered_output)
     else
         format_histogram(name, metric, metric[3])
     end
 end
 
-return function(data)
+local format_metric = function(name, metric, ordered_output)
+    help(name, metric)
+    format_typ[metric[1]](name, metric, ordered_output)
+end
+
+local order = {}
+
+return function(data, ordered_output)
     clear_tab(output)
 
     for name, metric in pairs(data) do
-        help(name, metric)
-        format_typ[metric[1]](name, metric)
+        if ordered_output then
+            insert(order, name)
+        else
+            format_metric(name, metric)
+        end
+    end
+
+    if ordered_output then
+        for _, name in ipairs(sort(order) or order) do
+            format_metric(name, data[name], true)
+        end
+
+        clear_tab(order)
     end
 
     return concat(output, "\n")
