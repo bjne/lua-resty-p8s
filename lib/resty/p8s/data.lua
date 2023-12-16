@@ -323,11 +323,18 @@ local set_help = function(self, help)
     return self
 end
 
+local set_merge = function(metric, bool)
+    metric[9] = not bool == true -- default is unset, so negate this
+
+    return metric
+end
+
 for _,m in ipairs(mt) do
     m.__index.help = set_help
     m.__index.reset = reset
     m.__index.getname = getname
     m.__index.delete = delete
+    m.__index.merge = set_merge
 end
 
 _M.output = function(shdict)

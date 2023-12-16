@@ -27,7 +27,8 @@ init_by_lua_block {
 }
 
 init_worker_by_lua_block {
-    _G.con = p8s.gauge("con", "state"):help("http connections")
+    -- set con to nomerge as its generated on request
+    _G.con = p8s.gauge("con", "state"):help("http connections"):merge(false)
     _G.req = p8s.counter("req", "host", "status"):help("http requests")
     _G.lat = p8s.histogram("lat", "host"):help("request latency")
 }

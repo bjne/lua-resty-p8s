@@ -17,6 +17,7 @@ local typ_counter, typ_gauge, typ_histogram = 1,2,3
 -- 6 updated
 -- 7 keycount
 -- 8 reset signal
+-- 9 nomerge
 
 local worker_data do
     local bufs = setmetatable({}, {__mode="v"})
@@ -137,7 +138,13 @@ local merge do
             typ, a_data = type(b_data), a[name]
 
             if not a_data then
-                a[name] = mt and setmetatable(b_data, mt[b_data[1]]) or b_data
+                if data[name] and data[name][9] then -- nomerge
+                    if b == data then
+                        a[name] = b_data -- merge from self
+                    end
+                else
+                    a[name] = mt and setmetatable(b_data, mt[b_data[1]]) or b_data
+                end
             elseif typ ~= type(a_data) then
                 data._c("multiple types for metric")
             elseif typ ~= "table" then
@@ -176,10 +183,11 @@ return function(shdict, worker, data, mt)
         the internal data structure from beeing mangled by a merge
     --]]
     for wid=0, worker_cnt do
-        if wid~=worker then
-            merge(merged, worker_data(shdict, wid, data), data)
-        elseif wid==worker_cnt then
+        if wid==worker_cnt then
+            ngx.log(ngx.ERR, "FINAL MERGE")
             merge(merged, data, data) -- final merge, no risk of data corruption
+        elseif wid~=worker then
+            merge(merged, worker_data(shdict, wid, data), data)
         end
     end
 
