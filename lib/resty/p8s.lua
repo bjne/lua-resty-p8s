@@ -16,7 +16,7 @@ local _M do
         histogram = data.histogram
     }
 
-    _M = setmetatable({_VERSION = "0.1.3" }, {
+    _M = setmetatable({_VERSION = "0.1.4" }, {
         __call = function()
             return output(shdict)
         end,
@@ -40,12 +40,12 @@ local _M do
     })
 end
 
-_M.enable_internal_metrics = function()
-    data.internal_metrics(true)
+_M.enable_internal_metrics = function(wid) -- true for all workers
+    data.internal_metrics(true, wid)
 end
 
-_M.disable_internal_metrics = function()
-    data.internal_metrics(false)
+_M.disable_internal_metrics = function(wid) -- true for all workers
+    data.internal_metrics(false, wid)
 end
 
 _M.init = function(interval, dict)

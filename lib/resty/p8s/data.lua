@@ -13,7 +13,8 @@ local ngx_worker_id = ngx.worker.id
 local worker_cnt = ngx.worker.count()
 local timer_running
 
-local data, memo, ipc, g, c, h = {}, {}, {}
+local data, memo, ipc = {}, {}, {}
+local msg, g, c
 local worker_id
 
 local _M, mt = {}, {}
@@ -61,6 +62,16 @@ local delete = function(self)
     data[self:getname()] = nil
 end
 
+local ipc_send = function(message, wid)
+    for w=(wid==true and 0 or wid),(wid==true and worker_cnt-1 or wid) do
+        if wid ~= worker_id then
+            ipc[w] = ipc[w] or strbuf.new()
+            ipc[w]:encode(message)
+        end
+    end
+
+end
+
 local reset = function(metric, wid)
     if not worker_id then worker_id = ngx_worker_id() end
     wid = wid or worker_id
@@ -88,12 +99,7 @@ local reset = function(metric, wid)
         metric[8] = 1  -- set flag to prevent merge from populating on start
     end
 
-    for w=(wid==true and 0 or wid),(wid==true and worker_cnt-1 or wid) do
-        if wid ~= worker_id then
-            ipc[w] = ipc[w] or strbuf.new()
-            ipc[w]:encode(getname(metric))
-        end
-    end
+    ipc_send(metric:getname(), wid)
 
     return metric
 end
@@ -359,16 +365,26 @@ do
         end
     end
 
-    _M.internal_metrics = function(enable)
+    _M.internal_metrics = function(enable, wid)
         internal_metrics = enable == true
         if not internal_metrics then
             _g = _g and _g:delete()
             _c = _c and _c:delete()
         end
+
+        if wid then -- true for all workers
+            ipc_send({cmd="internal_metrics", arg={enable}}, wid)
+        end
+    end
+
+    msg = function(m)
+        if m.cmd and _M[m.cmd] then
+            _M[m.cmd](unpack(m.arg))
+        end
     end
 end
 
-setmetatable(data, {__mode = "v", __index = {_g=g,_c=c,_h=h}})
+setmetatable(data, {__mode = "v", __index = {_g=g,_c=c,_h=h,_msg=msg}})
 
 
 return _M

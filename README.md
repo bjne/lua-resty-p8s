@@ -36,6 +36,15 @@ log_by_lua_block {
     req(ngx.var.server_name, ngx.var.status)
     lat(ngx.var.request_time, ngx.var.server_name)
 }
+
+server {
+    location /enable_internal_metrics {
+        -- enables internal metrics for a spesific worker (or true for all)
+        content_by_lua_block {
+            p8s.enable_internal_metrics(true)
+        }
+    }
+}
 ```
 
 * configures a shared dictionary with the default name `resty_p8s`

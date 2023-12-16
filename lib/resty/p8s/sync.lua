@@ -132,14 +132,18 @@ return function(shdict, data, memo, ipc)
 
         local nevent = 0
         while #ipcbuf > 0 do
-            local ok, name = pcall(ipcbuf.decode, ipcbuf)
+            local ok, msg = pcall(ipcbuf.decode, ipcbuf)
             if not ok then
                 data._c("failed to decode event")
                 break
             end
 
-            if data[name] then
-                data[name]:reset()
+            if type(msg) == "string" then
+                if data[msg] then
+                    data[msg]:reset()
+                end
+            elseif type(msg) == "table" then
+                data._msg(msg)
             end
 
             nevent = nevent + 1
