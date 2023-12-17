@@ -23,18 +23,23 @@ local walk do
     local function walk_recurse(metric, t, depth, k, ...)
         k = k or 'null'
 
+        local ktyp = type(k)
+
+        if ktyp == "number" then
+            if metric ~= t then -- first key is 3 (and should not be string)
+                k = tostring(k)
+            end
+        elseif ktyp ~= "string" then
+            return nil, "invalid label type: " .. ktyp
+        end
+
         if depth == 0 then
             return t, k
         end
 
         if not t[k] then
-            local ktyp = type(k)
-            if ktyp ~= "string" and ktyp ~= "number" then
-                return nil, "invalid label type: " .. ktyp
-            end
-
             metric[7] = (metric[7] or 0) + 1 -- key count
-            t[k], memo.buf = {}, nil
+            t[k], memo.rebuild = {}, true
         end
 
         return walk_recurse(metric, t[k], depth-1, ...)
@@ -171,7 +176,8 @@ local new_typ do
         end
 
         data[name] = {typ, labels, labels and {} or init, nil, nil, 0, 0}
-        memo.buf = nil
+
+        memo.rebuild = true
 
         return setmetatable(data[name], mt[typ])
     end
@@ -369,6 +375,10 @@ _M.output = function(shdict, internal_metrics, ...)
 
     ngx.header.content_type = "text/plain; version=0.0.4"
     ngx_say(format(merge(shdict, worker_id, data, internal_metrics), ...))
+end
+
+_M.sync = function(shdict)
+    return sync(shdict, data, memo, ipc)
 end
 
 do

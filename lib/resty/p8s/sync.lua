@@ -45,7 +45,7 @@ local function table_keys(t, keys)
     keys = keys or {}
 
     for k,v in pairs(t) do
-        if type(k) == "string" then
+        if type(k) == "string" and #k > 4 then
             insert(keys,k)
         end
 
@@ -62,11 +62,14 @@ local build_options_dict = function(shdict, data)
     local opts = {dict=keys}
     local hash_key, list_key = worker_id .. hash, worker_id .. '_p8s_hash'
 
+    local serialized_opts = strbuf.encode(opts)
+
     if data._internal_metrics then
         data._g(#keys, "dict keys")
+        data._g(#serialized_opts, "dict size")
     end
 
-    shdict:set(hash_key, strbuf.encode(opts))
+    shdict:set(hash_key, serialized_opts)
 
     if data._internal_metrics then
         data._c("build dict")
@@ -98,6 +101,10 @@ local ipc_key_suffix, ipc_key = "_p8s_ipc"
 return function(shdict, data, memo, ipc)
     local buf, hash = memo and memo.buf, memo and memo.hash
 
+    if memo and memo.rebuild then
+        buf, hash, memo.rebuild = nil, nil, nil
+    end
+
     if not worker_id then
         worker_id = ngx.worker.id()
         ipc_key = worker_id .. ipc_key_suffix
@@ -107,14 +114,14 @@ return function(shdict, data, memo, ipc)
         buf, hash = new_buf(shdict, data)
     end
 
-    if memo and not memo.buf or not hash then
+    if memo and not memo.buf or not memo.hash then
         memo.buf, memo.hash = buf, hash
     end
 
     local serialized = buf:reset():put(hash):encode(data):get()
 
     if data._internal_metrics then
-        data._g(#serialized, "serialized size")
+        data._g(#serialized, "data size")
     end
 
     shdict:set(worker_id, serialized)

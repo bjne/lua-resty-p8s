@@ -16,9 +16,13 @@ local _M do
         histogram = data.histogram
     }
 
-    _M = setmetatable({_VERSION = "0.2.2" }, {
+    _M = setmetatable({_VERSION = "0.2.3" }, {
         __call = function(_, ...)
-            return output(shdict, ...)
+            if not shdict and not ngx.shared[default_dict] then
+                return nil, "shdict not available"
+            end
+
+            return output(shdict or ngx.shared[default_dict], ...)
         end,
         __index = function(t,k)
             if get_phase() ~= "init" and not timer_started then
@@ -50,6 +54,14 @@ end
 
 _M.reset_internal_metrics = function(wid)
     data.reset_internal_metrics(wid)
+end
+
+_M.sync = function()
+    if not shdict and not ngx.shared[default_dict] then
+        return nil, "shdict not initialized"
+    end
+
+    return data.sync(shdict or ngx.shared[default_dict])
 end
 
 _M.init = function(interval, dict)

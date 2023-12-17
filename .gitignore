@@ -6,3 +6,4 @@ uwsgi_temp
 lua-resty-p8s-*
 test
 conf
+t/servroot
