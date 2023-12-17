@@ -106,7 +106,7 @@ so they get set immediately before metrics are returned to the client.
 
 ### init()
 
-**syntax:** require("p8s").init(*sync_interval*, *dict_name*)
+**syntax:** require("p8s").init(*sync_interval or dict_name*, *sync_interval or dict_name*)
 
 Initializes the module. This should be called once from `init` and/or `init_worker`
 If called from `init` sync-timers are not started, but will be autostarted first
@@ -123,7 +123,7 @@ Returns a `p8s` object that should be used to register metrics.
 Example:
 ```
 init_worker_by_lua_block {
-    p8s = require("p8s").init(1, "i_want_to_use_my_own_dict_name_for_some_reason")
+    p8s = require("p8s").init("i_want_to_use_my_own_dict_name_for_some_reason")
 }
 ```
 

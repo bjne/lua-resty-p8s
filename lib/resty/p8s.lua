@@ -16,7 +16,7 @@ local _M do
         histogram = data.histogram
     }
 
-    _M = setmetatable({_VERSION = "0.2.3" }, {
+    _M = setmetatable({_VERSION = "0.2.5" }, {
         __call = function(_, ...)
             if not shdict and not ngx.shared[default_dict] then
                 return nil, "shdict not available"
@@ -64,7 +64,15 @@ _M.sync = function()
     return data.sync(shdict or ngx.shared[default_dict])
 end
 
-_M.init = function(interval, dict)
+_M.init = function(a,b)
+    local interval, dict
+
+    if type(a) == "number" then
+        interval, dict = a, b
+    else
+        interval, dict = b, a
+    end
+
     sync_interval = tonumber(interval) or sync_interval
     if shdict then
         if data.start_timer(shdict, sync_interval) then
