@@ -23,7 +23,7 @@ our $http_config = <<'_EOC_';
         counter = p8s.counter("counter", "worker")
         histogram = p8s.histogram("histogram", "worker")
         gauge(10, ngx.worker.id())
-        counter(ngx.worker.id())
+        counter(1, ngx.worker.id())
         histogram(0.25, ngx.worker.id())
         p8s.sync()
     }
@@ -138,7 +138,7 @@ resty_p8s_gauge{worker="3",event="dict size"} 102
     location /t {
         content_by_lua_block {
             counter = p8s.counter("counter", "worker")
-            counter(ngx.worker.id())
+            counter(1, ngx.worker.id())
             p8s.sync()
         }
     }
@@ -175,7 +175,7 @@ counter\{worker="3"\} \d+$/
 --- config
     location /t {
         content_by_lua_block {
-            counter(0)
+            counter(1, 0)
             p8s.sync()
         }
     }

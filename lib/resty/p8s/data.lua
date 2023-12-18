@@ -200,12 +200,8 @@ do
 end
 
 do
-    local incr = function(self, l, ...)
-        local n = l
-
-        if self[2] and select('#', ...) < #self[2] then
-            n = nil
-        end
+    local incr = function(self, n, ...)
+        n = n or 1
 
         if n and type(n) ~= "number" then
             n = tonumber(n)
@@ -218,7 +214,7 @@ do
             end
         end
 
-        local t,k = walk(self, select(n and 2 or 1, l, ...))
+        local t,k = walk(self, ...)
 
         if not t then
             return nil, k
@@ -356,12 +352,36 @@ local set_merge = function(metric, bool)
     return metric
 end
 
+local set_labels do
+    local lmt = {__call = function(t,n,...)
+        local metric, labels, default = t.metric, t.labels, t.default
+
+        local label = 1
+
+        for l=1,(metric[2] and #metric[2] or 0) do
+            if default[l] and not labels[l] then
+                labels[l] = default[l]
+            elseif not default[l] then
+                labels[l] = (select(label,...))
+                label = label + 1
+            end
+        end
+
+        return metric(n, unpack(labels))
+    end}
+
+    set_labels = function(metric, ...)
+        return setmetatable({metric=metric, default={...}, labels={}}, lmt)
+    end
+end
+
 for _,m in ipairs(mt) do
     m.__index.help = set_help
     m.__index.reset = reset
     m.__index.getname = getname
     m.__index.delete = delete
     m.__index.merge = set_merge
+    m.__index.labels = set_labels
 end
 
 _M.output = function(shdict, internal_metrics, ...)

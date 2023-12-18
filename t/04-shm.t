@@ -20,7 +20,7 @@ our $http_config = <<'_EOC_';
 
     init_worker_by_lua_block {
         counter = p8s.counter("counter", "worker")
-        counter(ngx.worker.id())
+        counter(1, ngx.worker.id())
         p8s.sync()
     }
 _EOC_
@@ -58,7 +58,7 @@ counter{worker="3"} 1
 
     init_worker_by_lua_block {
         counter = p8s.counter("counter", "worker")
-        counter(ngx.worker.id())
+        counter(1, ngx.worker.id())
         p8s.sync()
     }
 --- config

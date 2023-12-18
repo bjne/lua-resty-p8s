@@ -1,31 +1,19 @@
 # vim:set ts=4 sw=4 et fdm=marker:
-BEGIN {
-    $ENV{TEST_NGINX_REUSE_PORT} = 1;
-}
+
+#BEGIN {
+#    $ENV{TEST_NGINX_USE_HUP} = 1;
+#}
 
 use Test::Nginx::Socket 'no_plan';
 
-master_on();
-workers(4);
-
-#repeat_each(10);
 
 our $http_config = <<'_EOC_';
     lua_shared_dict resty_p8s 10M;
     lua_package_path "$prefix/../../lib/?.lua;;";
 
+
     init_by_lua_block {
         p8s = require "resty.p8s"
-    }
-
-    init_worker_by_lua_block {
-        p8s.init(0.1)
-        counter = p8s.counter("counter", "worker")
-        counter(1, ngx.worker.id())
-        if ngx.worker.id() % 2 == 0 then
-            counter:reset()
-        end
-        p8s.sync()
     }
 _EOC_
 
@@ -34,11 +22,13 @@ run_tests();
 
 __DATA__
 
-=== TEST 1: reset local
+=== TEST 1: default labels
 --- http_config eval: $::http_config
 --- config
     location /p8s {
         content_by_lua_block {
+            local counter = p8s.counter("counter", "label1", "label2"):labels("default1")
+            counter(1, "label2")
             p8s(false, true)
         }
     }
@@ -46,17 +36,15 @@ __DATA__
 GET /p8s
 --- response_body
 # TYPE counter counter
-counter{worker="1"} 1
-counter{worker="3"} 1
+counter{label1="default1",label2="label2"} 1
 
-=== TEST 1: reset spesific worker
+=== TEST 2: more default labels
 --- http_config eval: $::http_config
 --- config
     location /p8s {
         content_by_lua_block {
-            counter:reset(1)
-            p8s.sync()
-            ngx.sleep(0.2)
+            local counter = p8s.counter("counter", "label1", "label2"):labels("default1", "default2")
+            counter(1)
             p8s(false, true)
         }
     }
@@ -64,16 +52,15 @@ counter{worker="3"} 1
 GET /p8s
 --- response_body
 # TYPE counter counter
-counter{worker="3"} 1
+counter{label1="default1",label2="default2"} 1
 
-=== TEST 2: reset all
+=== TEST 3: second label default
 --- http_config eval: $::http_config
 --- config
     location /p8s {
         content_by_lua_block {
-            counter:reset(true)
-            p8s.sync()
-            ngx.sleep(0.2)
+            local counter = p8s.counter("counter", "label1", "label2"):labels(nil, "default2")
+            counter(1, "label1")
             p8s(false, true)
         }
     }
@@ -81,3 +68,4 @@ counter{worker="3"} 1
 GET /p8s
 --- response_body
 # TYPE counter counter
+counter{label1="label1",label2="default2"} 1

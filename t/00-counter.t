@@ -75,7 +75,7 @@ label_counter{lbl1="null",lbl2="null"} 1
     location /p8s {
         content_by_lua_block {
             local counter = p8s.counter("label_counter", "lbl1", "lbl2")
-            counter("foo","bar")
+            counter(1, "foo","bar")
             p8s(false, true)
         }
     }

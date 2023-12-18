@@ -34,7 +34,7 @@ init_worker_by_lua_block {
 }
 
 log_by_lua_block {
-    req(ngx.var.server_name, ngx.var.status)
+    req(1, ngx.var.server_name, ngx.var.status)
     lat(ngx.var.request_time, ngx.var.server_name)
 }
 
@@ -210,7 +210,7 @@ location /metrics {
 
 Increments a previously registered counter.
 
-* `value` is a value that should be added to the counter. Defaults to 1.
+* `value` is a value that should be added to the counter. Defaults to 1
 * `label_value` zero or more label values
 
 The number of label values should match the number of label names defined when
@@ -221,7 +221,7 @@ Example:
 ```
 log_by_lua_block {
     metric_bytes(ngx.var.request_length)
-    metric_requests(ngx.var.server_name, ngx.var.status)
+    metric_requests(1, ngx.var.server_name, ngx.var.status)
 }
 ```
 
@@ -273,6 +273,21 @@ Example:
 Sets a HELP text for current metric, if that is something you want to waste bytes on
 
 * `help` text, nil to clear current help
+
+### (gauge or counter or histogram):labels(*label,...)
+
+**syntax:** (gauge or counter or histogram):labels(*label*, ...)
+
+Sets default labels for a metric
+
+Example:
+```
+    local counter = p8s.counter("counter", "worker", "event"):labels(ngx.worker.id())
+    counter(1, "some event")
+
+    local counter2 = p8s.counter("counter", "something", "event"):labels(nil, "some event")
+    counter(1, "something")
+```
 
 ## Testing
 
