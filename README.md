@@ -274,6 +274,12 @@ Sets a HELP text for current metric, if that is something you want to waste byte
 
 * `help` text, nil to clear current help
 
+## Testing
+
+cpan Test::Nginx Test::Nginx::Socket
+
+./test.sh
+
 ## What is different compared to alternatives
 
 This module uses LuaJIT serialization instead of pure shm to synchronize
