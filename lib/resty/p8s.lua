@@ -16,7 +16,7 @@ local _M do
         histogram = data.histogram
     }
 
-    _M = setmetatable({_VERSION = "0.2.7" }, {
+    _M = setmetatable({_VERSION = "0.3.0" }, {
         __call = function(_, ...)
             if not shdict and not ngx.shared[default_dict] then
                 return nil, "shdict not available"

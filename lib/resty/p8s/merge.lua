@@ -44,25 +44,27 @@ local worker_data do
         end
     end
 
+    local get_buf = function(shdict, worker, dict_id)
+        if bufs[dict_id] then
+            return bufs[dict_id]
+        end
+
+        return new_buf(shdict, worker, dict_id)
+    end
+
+    local wd = strbuf.new()
     worker_data = function(shdict, worker, data)
-        local wd = shdict:get(worker)
-        if wd then
-            local dict_id = sub(wd, 1, 32)
-
-            local buf, err = bufs[dict_id]
-
-            if not buf then
-                buf, err = new_buf(shdict, worker, dict_id)
-            end
+        wd:reset():put((shdict:get(worker)) or '')
+        if #wd > 32 then
+            local buf, err = get_buf(shdict, worker, wd:get(32))
 
             if buf then
-                buf:reset():put(wd):skip(32)
+                buf:set(wd:ref())
 
-                local ok
-                ok, wd = pcall(buf.decode, buf)
+                local ok, dec = pcall(buf.decode, buf)
 
                 if ok then
-                    return wd
+                    return dec
                 end
 
                 if data._internal_metrics then
@@ -80,7 +82,6 @@ local worker_data do
         end
     end
 end
-
 
 local merge do
     local diff = function(a,b)
