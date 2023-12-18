@@ -45,7 +45,7 @@ local function table_keys(t, keys)
     keys = keys or {}
 
     for k,v in pairs(t) do
-        if type(k) == "string" and #k > 4 then
+        if type(k) == "string" and #k > 2 then
             insert(keys,k)
         end
 
@@ -59,6 +59,7 @@ end
 
 local build_options_dict = function(shdict, data)
     local keys, hash = sha256_t(table_keys(data))
+
     local opts = {dict=keys}
     local hash_key, list_key = worker_id .. hash, worker_id .. '_p8s_hash'
 
@@ -99,32 +100,34 @@ local ipcbuf = strbuf.new()
 local ipc_key_suffix, ipc_key = "_p8s_ipc"
 
 return function(shdict, data, memo, ipc)
-    local buf, hash = memo and memo.buf, memo and memo.hash
-
-    if memo and memo.rebuild then
-        buf, hash, memo.rebuild = nil, nil, nil
-    end
-
     if not worker_id then
         worker_id = ngx.worker.id()
         ipc_key = worker_id .. ipc_key_suffix
     end
 
-    if not buf or not hash then
-        buf, hash = new_buf(shdict, data)
-    end
+    -- repeat is only done when internal_metric keys are added
+    local enc, siz repeat
+        local buf, hash = memo and memo.buf, memo and memo.hash
 
-    if memo and not memo.buf or not memo.hash then
-        memo.buf, memo.hash = buf, hash
-    end
+        siz = enc and #enc
 
-    local serialized = buf:reset():put(hash):encode(data):get()
+        if memo and memo.rebuild then
+            buf, hash, memo.rebuild = nil, nil, nil
+        end
 
-    if data._internal_metrics then
-        data._g(#serialized, "data size")
-    end
+        if not buf or not hash then
+            buf, hash = new_buf(shdict, data)
+            memo.buf, memo.hash = buf, hash
+        end
 
-    shdict:set(worker_id, serialized)
+        enc = buf:reset():put(hash):encode(data):get()
+
+        if data._internal_metrics then
+            data._g(#enc, "data size")
+        end
+    until not memo.rebuild and (not siz or siz==#enc)
+
+    shdict:set(worker_id, enc)
 
     if ipc then
         for worker=0,worker_cnt-1 do
